@@ -13,17 +13,23 @@ export default function Tour_Calculator() {
   const summaryRef = useRef(null)
   const [isSummaryVisible, setIsSummaryVisible] = useState(true)
 
-  // Cost configurations
+  // Cost configurations with updated values and new bus category
   const [costs, setCosts] = useState({
     hotel: {
-      standard: 15000,
-      business: 30000,
-      luxury: 60000,
+      standard: 20000,
+      business: 40000,
+      luxury: 80000,
     },
     tourismActivities: {
-      "city-tour-full": 150000,
-      "city-tour-half": 70000,
-      "free-day": 0,
+      "city-tour-full-small": 150000,
+      "city-tour-half-small": 70000,
+      "city-tour-full-large": 250000,
+      "city-tour-half-large": 150000,
+    },
+    tourGuides: {
+      "jr-tour-guide": 15000,
+      "tour-guide": 30000,
+      "sr-tour-guide": 50000,
     },
     businessActivities: {
       // For "conference-full", we now charge per person – see calculateDayTotal update.
@@ -34,6 +40,11 @@ export default function Tour_Calculator() {
       "ikigai-workshop-kamakura-full-day": 800000,
       "zen-and-tour-kamakura-full-day": 400000,
       "business-lectures-half-day": 300000,
+    },
+    bus: {
+      "micro-mini-bus": 180000,
+      "full-size-van": 70000,
+      "medium-size-bus": 250000,
     },
     transport: {
       "airport-transfer": 40000,
@@ -74,7 +85,21 @@ export default function Tour_Calculator() {
     KZT: 3.336,
   })
 
-  // Initialize day configurations
+  // Mapping for nicer labels for tourism activities and bus activities
+  const tourismActivityLabels = {
+    "city-tour-full-small": "City Tour Full (Small Group (Max 7))",
+    "city-tour-half-small": "City Tour Half (Small Group (Max 7))",
+    "city-tour-full-large": "City Tour Full (8-18)",
+    "city-tour-half-large": "City Tour Half (8-18)",
+  }
+
+  const busLabels = {
+    "micro-mini-bus": "Micro/Mini Bus (15-21 people)",
+    "full-size-van": "Full Size Van (6-9 people)",
+    "medium-size-bus": "Medium Size Bus (27-28 people)",
+  }
+
+  // Initialize day configurations – added bus field with default ""
   useEffect(() => {
     setDayConfigs(
       Array(numDays)
@@ -86,6 +111,8 @@ export default function Tour_Calculator() {
               return {
                 hotel: "standard",
                 tourismActivity: "",
+                tourGuide: "",
+                bus: "",
                 businessActivity: "",
                 transport: ["airport-transfer"],
                 extras: [],
@@ -95,17 +122,27 @@ export default function Tour_Calculator() {
               // Day 2: "City Tour Full" and add Tea Ceremony and Kimono.
               return {
                 hotel: "standard",
-                tourismActivity: "city-tour-full",
+                tourismActivity:
+                  numPeople <= 7
+                    ? "city-tour-full-small"
+                    : "city-tour-full-large",
+                tourGuide: "",
+                bus: "",
                 businessActivity: "",
                 transport: ["city-transfer"],
                 extras: ["tea-ceremony", "kimono"],
                 meals: ["lunch-standard", "dinner-standard"],
               }
             } else if (index === 5) {
-              // Day 6: Only dinner-business.
+              // Day 6: "City Tour Half" and Business Meeting.
               return {
                 hotel: "standard",
-                tourismActivity: "city-tour-half",
+                tourismActivity:
+                  numPeople <= 7
+                    ? "city-tour-half-small"
+                    : "city-tour-half-large",
+                tourGuide: "",
+                bus: "",
                 businessActivity: "business-meeting",
                 transport: ["city-transfer"],
                 extras: [],
@@ -116,6 +153,8 @@ export default function Tour_Calculator() {
               return {
                 hotel: "",
                 tourismActivity: "",
+                tourGuide: "",
+                bus: "",
                 businessActivity: "",
                 transport: ["airport-transfer"],
                 extras: [],
@@ -125,7 +164,12 @@ export default function Tour_Calculator() {
               // Other days (Day 3, 4, 5)
               return {
                 hotel: "standard",
-                tourismActivity: "city-tour-half",
+                tourismActivity:
+                  numPeople <= 7
+                    ? "city-tour-half-small"
+                    : "city-tour-half-large",
+                tourGuide: "",
+                bus: "",
                 businessActivity: "business-meeting",
                 transport: ["city-transfer"],
                 extras: [],
@@ -139,6 +183,8 @@ export default function Tour_Calculator() {
               return {
                 hotel: "standard",
                 tourismActivity: "",
+                tourGuide: "",
+                bus: "",
                 businessActivity: "",
                 transport: ["airport-transfer"],
                 extras: [],
@@ -149,6 +195,8 @@ export default function Tour_Calculator() {
               return {
                 hotel: "",
                 tourismActivity: "",
+                tourGuide: "",
+                bus: "",
                 businessActivity: "",
                 transport: ["airport-transfer"],
                 extras: [],
@@ -157,7 +205,12 @@ export default function Tour_Calculator() {
             }
             return {
               hotel: "standard",
-              tourismActivity: "city-tour-half",
+              tourismActivity:
+                numPeople <= 7
+                  ? "city-tour-half-small"
+                  : "city-tour-half-large",
+              tourGuide: "",
+              bus: "",
               businessActivity: "business-meeting",
               transport: ["city-transfer"],
               extras: [],
@@ -166,7 +219,7 @@ export default function Tour_Calculator() {
           }
         })
     )
-  }, [numDays])
+  }, [numDays, numPeople])
 
   // Set up IntersectionObserver to track visibility of Tour Summary.
   useEffect(() => {
@@ -205,19 +258,37 @@ export default function Tour_Calculator() {
       total += costs.hotel[config.hotel] * numPeople
     }
     // Tourism Activity (group)
-    if (config.tourismActivity && costs.tourismActivities[config.tourismActivity]) {
+    if (
+      config.tourismActivity &&
+      costs.tourismActivities[config.tourismActivity] !== undefined
+    ) {
       total += costs.tourismActivities[config.tourismActivity]
     }
+    // Tour Guide (group)
+    if (config.tourGuide && costs.tourGuides[config.tourGuide]) {
+      total += costs.tourGuides[config.tourGuide]
+    }
+    // Bus (group)
+    if (config.bus && costs.bus[config.bus] !== undefined) {
+      total += costs.bus[config.bus]
+    }
     // Business Activity – if it's "conference-full", charge per person.
-    if (config.businessActivity && costs.businessActivities[config.businessActivity]) {
+    if (
+      config.businessActivity &&
+      costs.businessActivities[config.businessActivity]
+    ) {
       if (config.businessActivity === "conference-full") {
-        total += costs.businessActivities[config.businessActivity] * numPeople
+        total +=
+          costs.businessActivities[config.businessActivity] *
+          numPeople
       } else {
         total += costs.businessActivities[config.businessActivity]
       }
     }
     // Transport (using smarter allocation)
-    const selectedTransports = config.transport.filter((t) => costs.transport[t] !== undefined)
+    const selectedTransports = config.transport.filter(
+      (t) => costs.transport[t] !== undefined
+    )
     const transportCapacities = {
       "airport-transfer": 9,
       "airport-transfer-small": 4,
@@ -239,7 +310,8 @@ export default function Tour_Calculator() {
         while (remaining > 0) {
           let bestOption = null
           for (let t of selectedTransports) {
-            const ratio = costs.transport[t] / transportCapacities[t]
+            const ratio =
+              costs.transport[t] / transportCapacities[t]
             if (bestOption === null || ratio < bestOption.ratio) {
               bestOption = { type: t, ratio }
             }
@@ -252,7 +324,13 @@ export default function Tour_Calculator() {
       }
     }
     // Extras – use group pricing for selected extras.
-    const groupExtras = ["translator-full", "translator-half", "special-side-event", "1h-public-speech", "snacks-and-drinks"]
+    const groupExtras = [
+      "translator-full",
+      "translator-half",
+      "special-side-event",
+      "1h-public-speech",
+      "snacks-and-drinks",
+    ]
     config.extras.forEach((e) => {
       const cost = costs.extras[e]
       if (groupExtras.includes(e)) {
@@ -287,7 +365,9 @@ export default function Tour_Calculator() {
       const currentItems = newConfigs[index][field] || []
       newConfigs[index] = {
         ...newConfigs[index],
-        [field]: add ? [...currentItems, item] : currentItems.filter((i) => i !== item),
+        [field]: add
+          ? [...currentItems, item]
+          : currentItems.filter((i) => i !== item),
       }
       return newConfigs
     })
@@ -329,7 +409,9 @@ export default function Tour_Calculator() {
                 min="1"
                 max="14"
                 value={numDays}
-                onChange={(e) => setNumDays(parseInt(e.target.value))}
+                onChange={(e) =>
+                  setNumDays(parseInt(e.target.value))
+                }
                 style={inputStyle}
               />
             </label>
@@ -341,7 +423,9 @@ export default function Tour_Calculator() {
                 type="number"
                 min="1"
                 value={numPeople}
-                onChange={(e) => setNumPeople(parseInt(e.target.value))}
+                onChange={(e) =>
+                  setNumPeople(parseInt(e.target.value))
+                }
                 style={inputStyle}
               />
             </label>
@@ -349,14 +433,21 @@ export default function Tour_Calculator() {
           <div style={inputGroupStyle}>
             <label>
               Currency:
-              <select value={currency} onChange={(e) => setCurrency(e.target.value)} style={selectStyle}>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                style={selectStyle}
+              >
                 <option value="JPY">JPY</option>
                 <option value="USD">USD</option>
                 <option value="KZT">KZT</option>
               </select>
             </label>
           </div>
-          <button onClick={() => setShowSettings(!showSettings)} style={buttonStyle}>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            style={buttonStyle}
+          >
             {showSettings ? "Hide Settings" : "Show Settings"}
           </button>
         </div>
@@ -364,24 +455,42 @@ export default function Tour_Calculator() {
         {showSettings && (
           <div style={settingsCardStyle}>
             <h3 style={subHeaderStyle}>Cost Settings</h3>
-            {Object.entries(costs).map(([category, items], categoryIndex) => (
-              <div key={`category-${categoryIndex}`} style={settingsSectionStyle}>
-                <h4 style={settingsHeaderStyle}>{capitalizeWords(category)}</h4>
-                {Object.entries(items).map(([key, value], itemIndex) => (
-                  <div key={`${category}-${itemIndex}`} style={settingsItemStyle}>
-                    <label>
-                      {capitalizeWords(key)}:
-                      <input
-                        type="number"
-                        value={value}
-                        onChange={(e) => updateCost(category, key, e.target.value)}
-                        style={inputStyle}
-                      />
-                    </label>
-                  </div>
-                ))}
-              </div>
-            ))}
+            {Object.entries(costs).map(
+              ([category, items], categoryIndex) => (
+                <div
+                  key={`category-${categoryIndex}`}
+                  style={settingsSectionStyle}
+                >
+                  <h4 style={settingsHeaderStyle}>
+                    {capitalizeWords(category)}
+                  </h4>
+                  {Object.entries(items).map(
+                    ([key, value], itemIndex) => (
+                      <div
+                        key={`${category}-${itemIndex}`}
+                        style={settingsItemStyle}
+                      >
+                        <label>
+                          {capitalizeWords(key.replace(/-/g, " "))}:
+                          <input
+                            type="number"
+                            value={value}
+                            onChange={(e) =>
+                              updateCost(
+                                category,
+                                key,
+                                e.target.value
+                              )
+                            }
+                            style={inputStyle}
+                          />
+                        </label>
+                      </div>
+                    )
+                  )}
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -394,15 +503,27 @@ export default function Tour_Calculator() {
                 Hotel Type:
                 <select
                   value={config.hotel}
-                  onChange={(e) => updateDayConfig(dayIndex, "hotel", e.target.value)}
+                  onChange={(e) =>
+                    updateDayConfig(
+                      dayIndex,
+                      "hotel",
+                      e.target.value
+                    )
+                  }
                   style={selectStyle}
                 >
                   <option value="">None</option>
-                  {Object.entries(costs.hotel).map(([type, cost], index) => (
-                    <option key={`hotel-${index}`} value={type}>
-                      {capitalizeWords(type)} ({formatCurrency(cost)}/person)
-                    </option>
-                  ))}
+                  {Object.entries(costs.hotel).map(
+                    ([type, cost], index) => (
+                      <option
+                        key={`hotel-${index}`}
+                        value={type}
+                      >
+                        {capitalizeWords(type)} (
+                        {formatCurrency(cost)}/person)
+                      </option>
+                    )
+                  )}
                 </select>
               </label>
             </div>
@@ -412,15 +533,85 @@ export default function Tour_Calculator() {
                 Tourism Activity:
                 <select
                   value={config.tourismActivity || ""}
-                  onChange={(e) => updateDayConfig(dayIndex, "tourismActivity", e.target.value)}
+                  onChange={(e) =>
+                    updateDayConfig(
+                      dayIndex,
+                      "tourismActivity",
+                      e.target.value
+                    )
+                  }
                   style={selectStyle}
                 >
                   <option value="">None</option>
-                  {Object.entries(costs.tourismActivities).map(([type, cost], index) => (
-                    <option key={`tourism-${index}`} value={type}>
-                      {capitalizeWords(type)} ({formatCurrency(cost)})
+                  {Object.entries(
+                    costs.tourismActivities
+                  ).map(([type, cost], index) => (
+                    <option
+                      key={`tourism-${index}`}
+                      value={type}
+                    >
+                      {tourismActivityLabels[type] || capitalizeWords(type)} (
+                      {formatCurrency(cost)})
                     </option>
                   ))}
+                </select>
+              </label>
+            </div>
+
+            <div style={sectionStyle}>
+              <label>
+                Tour Guide:
+                <select
+                  value={config.tourGuide || ""}
+                  onChange={(e) =>
+                    updateDayConfig(
+                      dayIndex,
+                      "tourGuide",
+                      e.target.value
+                    )
+                  }
+                  style={selectStyle}
+                >
+                  <option value="">None</option>
+                  {Object.entries(costs.tourGuides).map(
+                    ([type, cost], index) => (
+                      <option
+                        key={`tourguide-${index}`}
+                        value={type}
+                      >
+                        {capitalizeWords(type.replace(/-/g, " "))} (
+                        {formatCurrency(cost)})
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+            </div>
+
+            {/* New Bus Dropdown */}
+            <div style={sectionStyle}>
+              <label>
+                Bus:
+                <select
+                  value={config.bus || ""}
+                  onChange={(e) =>
+                    updateDayConfig(
+                      dayIndex,
+                      "bus",
+                      e.target.value
+                    )
+                  }
+                  style={selectStyle}
+                >
+                  <option value="">None</option>
+                  {Object.entries(costs.bus).map(
+                    ([type, cost], index) => (
+                      <option key={`bus-${index}`} value={type}>
+                        {busLabels[type] || capitalizeWords(type.replace(/-/g, " "))} (
+                        {formatCurrency(cost)})
+                      </option>
+                    )
+                  )}
                 </select>
               </label>
             </div>
@@ -430,39 +621,71 @@ export default function Tour_Calculator() {
                 Business Activity:
                 <select
                   value={config.businessActivity || ""}
-                  onChange={(e) => updateDayConfig(dayIndex, "businessActivity", e.target.value)}
+                  onChange={(e) =>
+                    updateDayConfig(
+                      dayIndex,
+                      "businessActivity",
+                      e.target.value
+                    )
+                  }
                   style={selectStyle}
                 >
                   <option value="">None</option>
-                  {Object.entries(costs.businessActivities).map(([type, cost], index) => (
-                    <option key={`business-${index}`} value={type}>
-                      {capitalizeWords(type)} ({formatCurrency(cost)})
-                    </option>
-                  ))}
+                  {Object.entries(costs.businessActivities).map(
+                    ([type, cost], index) => (
+                      <option
+                        key={`business-${index}`}
+                        value={type}
+                      >
+                        {capitalizeWords(type.replace(/-/g, " "))} (
+                        {formatCurrency(cost)})
+                      </option>
+                    )
+                  )}
                 </select>
               </label>
             </div>
 
             <div style={sectionStyle}>
               <p style={labelStyle}>Transport:</p>
-              {Object.entries(costs.transport).map(([type, cost], index) => {
-                if (type === "city-transfer" && (dayIndex === 0 || dayIndex === dayConfigs.length - 1))
-                  return null
-                return (
-                  <label key={`transport-${index}`} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={config.transport.includes(type)}
-                      onChange={(e) =>
-                        updateDayConfigArray(dayIndex, "transport", type, e.target.checked)
-                      }
-                      style={checkboxStyle}
-                    />
-                    {capitalizeWords(type)} ({formatCurrency(cost)}/
-                    {type === "airport-transfer" ? "car, max 9 people" : "car, max 4 people"})
-                  </label>
-                )
-              })}
+              {Object.entries(costs.transport).map(
+                ([type, cost], index) => {
+                  if (
+                    type === "city-transfer" &&
+                    (dayIndex === 0 ||
+                      dayIndex === dayConfigs.length - 1)
+                  )
+                    return null
+                  return (
+                    <label
+                      key={`transport-${index}`}
+                      style={checkboxLabelStyle}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={config.transport.includes(
+                          type
+                        )}
+                        onChange={(e) =>
+                          updateDayConfigArray(
+                            dayIndex,
+                            "transport",
+                            type,
+                            e.target.checked
+                          )
+                        }
+                        style={checkboxStyle}
+                      />
+                      {capitalizeWords(type.replace(/-/g, " "))} (
+                      {formatCurrency(cost)}/
+                      {type === "airport-transfer"
+                        ? "car, max 9 people"
+                        : "car, max 4 people"}
+                      )
+                    </label>
+                  )
+                }
+              )}
             </div>
 
             <div style={sectionStyle}>
@@ -470,40 +693,80 @@ export default function Tour_Calculator() {
               <div style={mealsGridStyle}>
                 <div>
                   <select
-                    value={config.meals.find((m) => m.startsWith("lunch-")) || ""}
+                    value={
+                      config.meals.find((m) =>
+                        m.startsWith("lunch-")
+                      ) || ""
+                    }
                     onChange={(e) => {
-                      const newMeals = config.meals.filter((m) => !m.startsWith("lunch-"))
-                      if (e.target.value) newMeals.push(e.target.value)
-                      updateDayConfig(dayIndex, "meals", newMeals)
+                      const newMeals =
+                        config.meals.filter(
+                          (m) =>
+                            !m.startsWith("lunch-")
+                        )
+                      if (e.target.value)
+                        newMeals.push(e.target.value)
+                      updateDayConfig(
+                        dayIndex,
+                        "meals",
+                        newMeals
+                      )
                     }}
                     style={selectStyle}
                   >
                     <option value="">No Lunch</option>
                     {Object.entries(costs.meals)
-                      .filter(([key]) => key.startsWith("lunch-"))
+                      .filter(([key]) =>
+                        key.startsWith("lunch-")
+                      )
                       .map(([type, cost], index) => (
-                        <option key={`lunch-${index}`} value={type}>
-                          {capitalizeWords(type)} ({formatCurrency(cost)}/person)
+                        <option
+                          key={`lunch-${index}`}
+                          value={type}
+                        >
+                          {capitalizeWords(type.replace(/-/g, " "))} (
+                          {formatCurrency(cost)}
+                          /person)
                         </option>
                       ))}
                   </select>
                 </div>
                 <div>
                   <select
-                    value={config.meals.find((m) => m.startsWith("dinner-")) || ""}
+                    value={
+                      config.meals.find((m) =>
+                        m.startsWith("dinner-")
+                      ) || ""
+                    }
                     onChange={(e) => {
-                      const newMeals = config.meals.filter((m) => !m.startsWith("dinner-"))
-                      if (e.target.value) newMeals.push(e.target.value)
-                      updateDayConfig(dayIndex, "meals", newMeals)
+                      const newMeals =
+                        config.meals.filter(
+                          (m) =>
+                            !m.startsWith("dinner-")
+                        )
+                      if (e.target.value)
+                        newMeals.push(e.target.value)
+                      updateDayConfig(
+                        dayIndex,
+                        "meals",
+                        newMeals
+                      )
                     }}
                     style={selectStyle}
                   >
                     <option value="">No Dinner</option>
                     {Object.entries(costs.meals)
-                      .filter(([key]) => key.startsWith("dinner-"))
+                      .filter(([key]) =>
+                        key.startsWith("dinner-")
+                      )
                       .map(([type, cost], index) => (
-                        <option key={`dinner-${index}`} value={type}>
-                          {capitalizeWords(type)} ({formatCurrency(cost)}/person)
+                        <option
+                          key={`dinner-${index}`}
+                          value={type}
+                        >
+                          {capitalizeWords(type.replace(/-/g, " "))} (
+                          {formatCurrency(cost)}
+                          /person)
                         </option>
                       ))}
                   </select>
@@ -514,30 +777,57 @@ export default function Tour_Calculator() {
             <div style={sectionStyle}>
               <p style={labelStyle}>Extras:</p>
               <div style={extrasGridStyle}>
-                {Object.entries(costs.extras).map(([type, cost], index) => (
-                  <label key={`extra-${index}`} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={config.extras.includes(type)}
-                      onChange={(e) =>
-                        updateDayConfigArray(dayIndex, "extras", type, e.target.checked)
-                      }
-                      style={checkboxStyle}
-                    />
-                    {capitalizeWords(type)} ({formatCurrency(cost)}/
-                    {(["translator-full", "translator-half", "special-side-event", "1h-public-speech", "snacks-and-drinks"].includes(type)
-                      ? "group"
-                      : "person")})
-                  </label>
-                ))}
+                {Object.entries(costs.extras).map(
+                  ([type, cost], index) => (
+                    <label
+                      key={`extra-${index}`}
+                      style={checkboxLabelStyle}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={config.extras.includes(
+                          type
+                        )}
+                        onChange={(e) =>
+                          updateDayConfigArray(
+                            dayIndex,
+                            "extras",
+                            type,
+                            e.target.checked
+                          )
+                        }
+                        style={checkboxStyle}
+                      />
+                      {capitalizeWords(type.replace(/-/g, " "))} (
+                      {formatCurrency(cost)}/
+                      {[
+                        "translator-full",
+                        "translator-half",
+                        "special-side-event",
+                        "1h-public-speech",
+                        "snacks-and-drinks",
+                      ].includes(type)
+                        ? "group"
+                        : "person"}
+                      )
+                    </label>
+                  )
+                )}
               </div>
             </div>
 
             <div style={totalStyle}>
-              <div>Day Total (Group): {formatCurrency(calculateDayTotal(config))}</div>
+              <div>
+                Day Total (Group):{" "}
+                {formatCurrency(calculateDayTotal(config))}
+              </div>
               <div>
                 Day Total (Per Person):{" "}
-                {formatCurrency(Math.round(calculateDayTotal(config) / numPeople))}
+                {formatCurrency(
+                  Math.round(
+                    calculateDayTotal(config) / numPeople
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -550,38 +840,57 @@ export default function Tour_Calculator() {
               <h4 style={summaryHeaderStyle}>Our Cost</h4>
               <div style={summarySectionStyle}>
                 <p style={labelStyle}>JPY:</p>
-                <p>Total group cost: ¥{calculateTotal().toLocaleString()}</p>
+                <p>
+                  Total group cost: ¥
+                  {calculateTotal().toLocaleString()}
+                </p>
                 <p>
                   Cost per person: ¥
-                  {Math.round(calculateTotal() / numPeople).toLocaleString()}
+                  {Math.round(
+                    calculateTotal() / numPeople
+                  ).toLocaleString()}
                 </p>
               </div>
               <div style={summarySectionStyle}>
                 <p style={labelStyle}>USD:</p>
                 <p>
                   Total group cost: $
-                  {Math.round(calculateTotal() * exchangeRates.USD).toLocaleString()}
+                  {Math.round(
+                    calculateTotal() * exchangeRates.USD
+                  ).toLocaleString()}
                 </p>
                 <p>
                   Cost per person: $
-                  {Math.round((calculateTotal() / numPeople) * exchangeRates.USD).toLocaleString()}
+                  {Math.round(
+                    (calculateTotal() / numPeople) *
+                    exchangeRates.USD
+                  ).toLocaleString()}
                 </p>
               </div>
               <div style={summarySectionStyle}>
                 <p style={labelStyle}>KZT:</p>
                 <p>
                   Total group cost:{" "}
-                  {Math.round(calculateTotal() * exchangeRates.KZT).toLocaleString()} KZT
+                  {Math.round(
+                    calculateTotal() * exchangeRates.KZT
+                  ).toLocaleString()}{" "}
+                  KZT
                 </p>
                 <p>
                   Cost per person:{" "}
-                  {Math.round((calculateTotal() / numPeople) * exchangeRates.KZT).toLocaleString()} KZT
+                  {Math.round(
+                    (calculateTotal() / numPeople) *
+                    exchangeRates.KZT
+                  ).toLocaleString()}{" "}
+                  KZT
                 </p>
               </div>
             </div>
 
             <div>
-              <h4 style={summaryHeaderStyle}>Client Price Per Person</h4>
+              <h4 style={summaryHeaderStyle}>
+                Client Price Per Person
+              </h4>
               <div style={summarySectionStyle}>
                 <p style={labelStyle}>JPY:</p>
                 <p>{clientPricePerPersonJPY}</p>
@@ -606,11 +915,12 @@ export default function Tour_Calculator() {
       {!isSummaryVisible && (
         <div style={stickySummaryStyle}>
           <p>
-            Client Price Per Person: {clientPricePerPersonKZT} / {clientPricePerPersonUSD} /{" "}
-            {clientPricePerPersonJPY}
+            Client Price Per Person: {clientPricePerPersonKZT} /{" "}
+            {clientPricePerPersonUSD} / {clientPricePerPersonJPY}
           </p>
           <p>
-            Number Of People: {numPeople} | Number Of Days: {numDays}
+            Number Of People: {numPeople} | Number Of Days:{" "}
+            {numDays}
           </p>
         </div>
       )}
